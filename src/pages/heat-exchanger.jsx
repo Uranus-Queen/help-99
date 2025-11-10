@@ -1,5 +1,5 @@
 // @ts-ignore;
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 // @ts-ignore;
 import { Button, Form, useToast } from '@/components/ui';
 // @ts-ignore;
@@ -7,7 +7,7 @@ import { Mail, Thermometer, Droplets, Wind, Zap, CheckCircle, Loader2, Settings,
 
 import { useForm } from 'react-hook-form';
 import { SecureFormField } from '@/components/SecureFormField';
-import { escapeHtml, encryptData, generateCSRFToken, generateAPISignature, getClientInfo, debounce, rateLimiter } from '@/lib/security';
+import { escapeHtml, encryptData, generateCSRFToken, generateAPISignature, getEnhancedClientInfo, collectUserBehavior, debounce, rateLimiter } from '@/lib/security';
 import Header from '@/components/Header';
 export default function HeatExchangerForm(props) {
   const {
@@ -23,6 +23,10 @@ export default function HeatExchangerForm(props) {
   const [csrfToken, setCsrfToken] = useState('');
   const [showSecurityInfo, setShowSecurityInfo] = useState(false);
   const [encryptionStatus, setEncryptionStatus] = useState('ready');
+  const [clientInfo, setClientInfo] = useState(null);
+  const [userBehavior, setUserBehavior] = useState(null);
+  const cleanupBehaviorRef = useRef(null);
+  const formStartTime = useRef(Date.now());
   const heatExchangerTypes = [{
     value: 'shell-tube',
     label: '管壳式'
@@ -71,9 +75,27 @@ export default function HeatExchangerForm(props) {
   });
   useEffect(() => {
     setIsLoaded(true);
+
+    // 生成CSRF Token
     const token = generateCSRFToken();
     setCsrfToken(token);
     sessionStorage.setItem('csrfToken', token);
+
+    // 收集增强的客户端信息
+    const enhancedInfo = getEnhancedClientInfo();
+    setClientInfo(enhancedInfo);
+
+    // 开始收集用户行为数据
+    const cleanupBehavior = collectUserBehavior();
+    cleanupBehaviorRef.current = cleanupBehavior;
+
+    // 页面卸载时清理
+    return () => {
+      if (cleanupBehaviorRef.current) {
+        const behaviorData = cleanupBehaviorRef.current();
+        setUserBehavior(behaviorData);
+      }
+    };
   }, []);
   const debouncedValidation = useCallback(debounce((fieldName, value) => {
     form.trigger(fieldName);
@@ -83,24 +105,52 @@ export default function HeatExchangerForm(props) {
       const remainingTime = Math.ceil(rateLimiter.getRemainingTime() / 1000);
       throw new Error(`请求过于频繁，请${remainingTime}秒后再试`);
     }
-    const clientInfo = getClientInfo();
+
+    // 收集最终的用户行为数据
+    let finalBehavior = null;
+    if (cleanupBehaviorRef.current) {
+      finalBehavior = cleanupBehaviorRef.current();
+    }
     const timestamp = Date.now();
     const nonce = generateCSRFToken();
+
+    // 清理和转义表单数据
     const sanitizedData = {};
     Object.keys(data).forEach(key => {
       if (data[key]) {
         sanitizedData[key] = escapeHtml(data[key].toString());
       }
     });
+
+    // 准备完整的提交数据
     const submitData = {
-      ...sanitizedData,
-      clientInfo,
-      timestamp,
-      nonce,
-      csrfToken
+      // 表单数据
+      formData: sanitizedData,
+      // 增强的客户端信息
+      clientInfo: clientInfo,
+      // 用户行为数据
+      userBehavior: finalBehavior,
+      // 表单交互统计
+      formStats: {
+        formStartTime: formStartTime.current,
+        formSubmitTime: timestamp,
+        timeToSubmit: timestamp - formStartTime.current,
+        fieldChanges: form.formState.dirtyFields,
+        touchedFields: form.formState.touchedFields,
+        submitCount: form.formState.submitCount,
+        errors: form.formState.errors
+      },
+      // 安全信息
+      security: {
+        csrfToken,
+        timestamp,
+        nonce
+      }
     };
+
+    // 生成API签名
     const signature = generateAPISignature(sanitizedData, timestamp, nonce);
-    submitData.signature = signature;
+    submitData.security.signature = signature;
     setEncryptionStatus('encrypting');
     const encryptedData = encryptData(submitData);
     if (!encryptedData) {
@@ -115,7 +165,15 @@ export default function HeatExchangerForm(props) {
           signature,
           timestamp,
           nonce,
-          csrfToken
+          csrfToken,
+          // 发送未加密的元数据用于日志记录
+          metadata: {
+            formId: 'heat-exchanger-config',
+            version: '1.0',
+            userAgent: clientInfo?.userAgent,
+            sessionId: clientInfo?.sessionId,
+            submitTime: new Date().toISOString()
+          }
         }
       });
       return result;
@@ -196,13 +254,14 @@ export default function HeatExchangerForm(props) {
               {showSecurityInfo && <div className="mb-6 p-4 bg-blue-50/50 border border-blue-200/50 rounded-lg">
                   <div className="flex items-center gap-2 mb-2">
                     <Shield className="w-4 h-4 text-blue-600" />
-                    <span className="text-sm font-semibold text-blue-800">安全保护信息</span>
+                    <span className="text-sm font-semibold text-blue-800">数据收集信息</span>
                   </div>
                   <ul className="text-xs text-blue-700 space-y-1">
-                    <li>• 数据已加密传输和存储</li>
-                    <li>• 通过了XSS和CSRF防护验证</li>
-                    <li>• API接口安全验证通过</li>
-                    <li>• 您的隐私信息已得到保护</li>
+                    <li>• 表单数据已完整收集</li>
+                    <li>• 浏览器和设备信息已记录</li>
+                    <li>• 用户行为数据已分析</li>
+                    <li>• 所有数据已加密保护</li>
+                    <li>• 遵循隐私保护法规</li>
                   </ul>
                 </div>}
               
@@ -215,6 +274,7 @@ export default function HeatExchangerForm(props) {
                 setIsSubmitted(false);
                 form.reset();
                 setShowSecurityInfo(false);
+                formStartTime.current = Date.now();
               }} className="w-full bg-gradient-to-r from-blue-500/90 to-purple-600/90 hover:from-blue-600/90 hover:to-purple-700/90 text-white font-semibold py-4 rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-xl border border-white/30 backdrop-blur-md">
                   <Sparkles className="w-4 h-4 mr-2" />
                   提交新的需求
