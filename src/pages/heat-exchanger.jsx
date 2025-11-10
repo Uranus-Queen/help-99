@@ -6,7 +6,7 @@ import { Button, Form, useToast } from '@/components/ui';
 import { Mail, Thermometer, Droplets, Wind, Zap, CheckCircle, Loader2, Settings, Gauge, Waves, Shield, Sparkles, ArrowRight, Building2, AlertCircle } from 'lucide-react';
 
 import { useForm } from 'react-hook-form';
-import { SimpleFormField } from '@/components/SimpleFormField';
+import { SimpleFormField } from '@/components/SecureFormField';
 import { debounce, validators } from '@/lib/security';
 import Header from '@/components/Header';
 export default function HeatExchangerForm(props) {
