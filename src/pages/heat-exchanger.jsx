@@ -3,11 +3,12 @@ import React, { useState, useEffect, useCallback } from 'react';
 // @ts-ignore;
 import { Button, Form, useToast } from '@/components/ui';
 // @ts-ignore;
-import { Mail, Thermometer, Droplets, Wind, Zap, CheckCircle, Loader2, Settings, Gauge, Waves, Shield, Sparkles, ArrowRight, Building2, AlertCircle, Lock, Eye, EyeOff } from 'lucide-react';
+import { Mail, Thermometer, Droplets, Wind, Zap, CheckCircle, Loader2, Settings, Gauge, Waves, Shield, Sparkles, ArrowRight, Building2, AlertCircle, Lock } from 'lucide-react';
 
 import { useForm } from 'react-hook-form';
 import { SecureFormField } from '@/components/SecureFormField';
 import { escapeHtml, encryptData, generateCSRFToken, generateAPISignature, getClientInfo, debounce, rateLimiter } from '@/lib/security';
+import Header from '@/components/Header';
 export default function HeatExchangerForm(props) {
   const {
     $w,
@@ -22,16 +23,6 @@ export default function HeatExchangerForm(props) {
   const [csrfToken, setCsrfToken] = useState('');
   const [showSecurityInfo, setShowSecurityInfo] = useState(false);
   const [encryptionStatus, setEncryptionStatus] = useState('ready');
-
-  // API配置 - 指向您的Python服务器
-  const API_CONFIG = {
-    baseUrl: 'https://106.14.94.111:5000',
-    endpoints: {
-      submit: '/api/heat-exchanger/submit'
-    }
-  };
-
-  // 换热器类型选项
   const heatExchangerTypes = [{
     value: 'shell-tube',
     label: '管壳式'
@@ -48,8 +39,6 @@ export default function HeatExchangerForm(props) {
     value: 'other',
     label: '其他'
   }];
-
-  // 材质选项
   const materials = [{
     value: 'stainless-steel',
     label: '不锈钢'
@@ -80,47 +69,29 @@ export default function HeatExchangerForm(props) {
       email: ''
     }
   });
-
-  // 初始化CSRF Token
   useEffect(() => {
     setIsLoaded(true);
     const token = generateCSRFToken();
     setCsrfToken(token);
-
-    // 存储CSRF Token到sessionStorage
     sessionStorage.setItem('csrfToken', token);
   }, []);
-
-  // 防抖验证函数
   const debouncedValidation = useCallback(debounce((fieldName, value) => {
-    // 触发字段验证
     form.trigger(fieldName);
   }, 500), [form]);
-
-  // 安全数据提交函数 - 调用Python后端
   const secureSubmit = async data => {
-    // 检查请求频率限制
     if (!rateLimiter.isAllowed()) {
       const remainingTime = Math.ceil(rateLimiter.getRemainingTime() / 1000);
       throw new Error(`请求过于频繁，请${remainingTime}秒后再试`);
     }
-
-    // 获取客户端信息
     const clientInfo = getClientInfo();
-
-    // 生成时间戳和随机数
     const timestamp = Date.now();
     const nonce = generateCSRFToken();
-
-    // 数据清理和转义
     const sanitizedData = {};
     Object.keys(data).forEach(key => {
       if (data[key]) {
         sanitizedData[key] = escapeHtml(data[key].toString());
       }
     });
-
-    // 准备要提交的数据
     const submitData = {
       ...sanitizedData,
       clientInfo,
@@ -128,12 +99,8 @@ export default function HeatExchangerForm(props) {
       nonce,
       csrfToken
     };
-
-    // 生成API签名
     const signature = generateAPISignature(sanitizedData, timestamp, nonce);
     submitData.signature = signature;
-
-    // 加密敏感数据
     setEncryptionStatus('encrypting');
     const encryptedData = encryptData(submitData);
     if (!encryptedData) {
@@ -141,33 +108,19 @@ export default function HeatExchangerForm(props) {
     }
     setEncryptionStatus('encrypted');
     try {
-      // 调用Python后端API
-      const response = await fetch(`${API_CONFIG.baseUrl}${API_CONFIG.endpoints.submit}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Requested-With': 'XMLHttpRequest',
-          'Origin': window.location.origin
-        },
-        body: JSON.stringify({
+      const result = await $w.cloud.callFunction({
+        name: 'submitHeatExchangerRequest',
+        data: {
           encryptedData,
           signature,
           timestamp,
           nonce,
           csrfToken
-        })
+        }
       });
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
-      }
-      const result = await response.json();
       return result;
     } catch (error) {
       console.error('API调用失败:', error);
-      if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
-        throw new Error('无法连接到服务器，请检查网络连接或联系管理员');
-      }
       throw error;
     }
   };
@@ -175,7 +128,6 @@ export default function HeatExchangerForm(props) {
     setIsSubmitting(true);
     setEncryptionStatus('ready');
     try {
-      // 安全提交数据到Python后端
       const result = await secureSubmit(values);
       setIsSubmitted(true);
       toast({
@@ -197,8 +149,6 @@ export default function HeatExchangerForm(props) {
         errorMessage = '安全验证失败，请刷新页面重试';
       } else if (error.message.includes('签名验证失败')) {
         errorMessage = '数据完整性验证失败，请重试';
-      } else if (error.message.includes('无法连接到服务器')) {
-        errorMessage = '服务器连接失败，请联系管理员';
       }
       toast({
         title: "提交失败",
@@ -216,7 +166,6 @@ export default function HeatExchangerForm(props) {
   };
   if (isSubmitted) {
     return <div style={style} className="min-h-screen bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-100 flex items-center justify-center p-4 relative overflow-hidden">
-        {/* 动态背景 */}
         <div className="absolute inset-0">
           <div className="absolute top-20 left-20 w-72 h-72 bg-purple-300 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-float-1"></div>
           <div className="absolute top-40 right-20 w-72 h-72 bg-yellow-300 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-float-2"></div>
@@ -244,14 +193,13 @@ export default function HeatExchangerForm(props) {
                 </p>
               </div>
               
-              {/* 安全信息显示 */}
               {showSecurityInfo && <div className="mb-6 p-4 bg-blue-50/50 border border-blue-200/50 rounded-lg">
                   <div className="flex items-center gap-2 mb-2">
                     <Shield className="w-4 h-4 text-blue-600" />
                     <span className="text-sm font-semibold text-blue-800">安全保护信息</span>
                   </div>
                   <ul className="text-xs text-blue-700 space-y-1">
-                    <li>• 数据已加密传输到安全服务器</li>
+                    <li>• 数据已加密传输和存储</li>
                     <li>• 通过了XSS和CSRF防护验证</li>
                     <li>• API接口安全验证通过</li>
                     <li>• 您的隐私信息已得到保护</li>
@@ -277,8 +225,9 @@ export default function HeatExchangerForm(props) {
         </div>
       </div>;
   }
-  return <div style={style} className="min-h-screen bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-100 p-2 sm:p-4 relative overflow-hidden">
-      {/* 动态背景 */}
+  return <div style={style} className="min-h-screen bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-100">
+      <Header />
+      
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-purple-300 rounded-full mix-blend-multiply filter blur-2xl opacity-40 animate-float-1"></div>
         <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-blue-300 rounded-full mix-blend-multiply filter blur-2xl opacity-40 animate-float-2"></div>
@@ -290,8 +239,7 @@ export default function HeatExchangerForm(props) {
         <div className="absolute top-1/3 left-1/2 w-52 h-52 bg-teal-300 rounded-full mix-blend-multiply filter blur-lg opacity-28 animate-float-8"></div>
       </div>
 
-      <div className={`relative z-10 max-w-6xl mx-auto transition-all duration-1000 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
-        {/* 标题区域 */}
+      <div className={`relative z-10 max-w-6xl mx-auto transition-all duration-1000 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'} pt-24 sm:pt-28`}>
         <div className="text-center mb-6 sm:mb-8 pt-4 sm:pt-6 px-2">
           <div className="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br from-blue-500/90 via-purple-500/90 to-pink-500/90 rounded-2xl sm:rounded-3xl mb-4 sm:mb-6 shadow-2xl border border-white/40 backdrop-blur-2xl">
             <Thermometer className="w-8 h-8 sm:w-10 sm:h-10 text-white drop-shadow-lg" />
@@ -304,7 +252,6 @@ export default function HeatExchangerForm(props) {
           </p>
         </div>
 
-        {/* 安全状态指示器 */}
         <div className="mb-4 flex justify-center">
           <div className="backdrop-blur-sm bg-white/20 rounded-full px-4 py-2 border border-white/30 flex items-center gap-2">
             <Shield className="w-4 h-4 text-green-500" />
@@ -314,7 +261,6 @@ export default function HeatExchangerForm(props) {
           </div>
         </div>
 
-        {/* 表单卡片 */}
         <div className="backdrop-blur-3xl bg-white/20 border border-white/40 shadow-2xl rounded-2xl sm:rounded-3xl overflow-hidden">
           <div className="bg-gradient-to-r from-blue-500/90 via-purple-500/90 to-pink-500/90 p-4 sm:p-5 backdrop-blur-md border-b border-white/30">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -337,7 +283,6 @@ export default function HeatExchangerForm(props) {
           <div className="p-4 sm:p-6 lg:p-8 backdrop-blur-md bg-white/10">
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 sm:space-y-8">
-                {/* 核心参数 */}
                 <div className="space-y-4 sm:space-y-6">
                   <div className="flex items-center gap-3 mb-4">
                     <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-red-500/90 to-orange-500/90 rounded-xl flex items-center justify-center shadow-lg border border-white/40 backdrop-blur-lg">
@@ -369,7 +314,6 @@ export default function HeatExchangerForm(props) {
                   </div>
                 </div>
 
-                {/* 流体和材质参数 */}
                 <div className="space-y-4 sm:space-y-6">
                   <div className="flex items-center gap-3 mb-4">
                     <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-cyan-500/90 to-blue-500/90 rounded-xl flex items-center justify-center shadow-lg border border-white/40 backdrop-blur-lg">
@@ -401,7 +345,6 @@ export default function HeatExchangerForm(props) {
                   </div>
                 </div>
 
-                {/* 附加要求 */}
                 <div className="space-y-4">
                   <div className="flex items-center gap-3 mb-4">
                     <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-green-500/90 to-emerald-500/90 rounded-xl flex items-center justify-center shadow-lg border border-white/40 backdrop-blur-lg">
@@ -417,7 +360,6 @@ export default function HeatExchangerForm(props) {
                   </div>
                 </div>
 
-                {/* 联系邮箱 */}
                 <div className="backdrop-blur-xl bg-white/30 rounded-xl p-6 border border-white/40 shadow-lg transition-all duration-300 hover:shadow-xl hover:bg-white/40">
                   <div className="flex items-center gap-3 mb-4">
                     <div className="w-10 h-10 bg-gradient-to-br from-blue-500/90 to-purple-600/90 rounded-xl flex items-center justify-center shadow-lg border border-white/40 backdrop-blur-lg">
@@ -431,7 +373,6 @@ export default function HeatExchangerForm(props) {
                 }} className="pl-10 pr-4 py-3 text-base" />
                 </div>
 
-                {/* 提交按钮 */}
                 <div className="flex justify-center pt-6 sm:pt-8">
                   <Button type="submit" disabled={isSubmitting} className="group relative bg-gradient-to-r from-blue-500/90 via-purple-500/90 to-pink-500/90 hover:from-blue-600/90 hover:via-purple-600/90 hover:to-pink-600/90 text-white font-bold py-3 sm:py-4 px-8 sm:px-12 rounded-xl sm:rounded-2xl transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed shadow-2xl border border-white/40 backdrop-blur-lg text-base sm:text-lg w-full sm:w-auto">
                     <span className="relative z-10 flex items-center gap-2 sm:gap-3 justify-center">
@@ -452,7 +393,6 @@ export default function HeatExchangerForm(props) {
           </div>
         </div>
 
-        {/* 底部信息 */}
         <div className="text-center mt-6 sm:mt-10 text-gray-600">
           <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6 text-xs sm:text-sm">
             <div className="flex items-center gap-1 sm:gap-2 backdrop-blur-sm bg-white/30 rounded-full px-3 py-1 border border-white/30">
@@ -497,7 +437,7 @@ export default function HeatExchangerForm(props) {
         @keyframes float-3 {
           0%, 100% { transform: translate(0px, 0px) scale(1) rotate(0deg); }
           33% { transform: translate(40px, -60px) scale(1.15) rotate(120deg); }
-          66% { transform: translate(-60px, 40px scale(0.85) rotate(240deg); }
+          66% { transform: translate(-60px, 40px) scale(0.85) rotate(240deg); }
         }
         
         @keyframes float-4 {

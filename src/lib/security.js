@@ -26,7 +26,6 @@ export const validators = {
   // 功率验证 (支持范围值)
   power: (power) => {
     if (!power) return false;
-    // 支持单个值或范围值 (如: 100 或 50-200)
     const rangeRegex = /^(\d+(\.\d+)?)(-\d+(\.\d+)?)?$/;
     if (!rangeRegex.test(power)) return false;
     
@@ -95,11 +94,10 @@ export const validators = {
   }
 };
 
-// 数据加密函数 (简单实现，实际应用中应使用更强的加密)
+// 数据加密函数
 export const encryptData = (data) => {
   try {
     const jsonString = JSON.stringify(data);
-    // 使用Base64编码 (实际应用中应使用AES等强加密算法)
     return btoa(unescape(encodeURIComponent(jsonString)));
   } catch (error) {
     console.error('数据加密失败:', error);
@@ -116,13 +114,12 @@ export const generateCSRFToken = () => {
 
 // API签名生成
 export const generateAPISignature = (data, timestamp, nonce) => {
-  // 简单的签名实现 (实际应用中应使用HMAC-SHA256等)
   const stringToSign = `${JSON.stringify(data)}${timestamp}${nonce}`;
   let hash = 0;
   for (let i = 0; i < stringToSign.length; i++) {
     const char = stringToSign.charCodeAt(i);
     hash = ((hash << 5) - hash) + char;
-    hash = hash & hash; // 转换为32位整数
+    hash = hash & hash;
   }
   return hash.toString(16);
 };
@@ -157,11 +154,10 @@ export const debounce = (func, wait) => {
 export const rateLimiter = {
   requests: [],
   maxRequests: 10,
-  timeWindow: 60000, // 1分钟
+  timeWindow: 60000,
   
   isAllowed() {
     const now = Date.now();
-    // 清理过期的请求记录
     this.requests = this.requests.filter(time => now - time < this.timeWindow);
     
     if (this.requests.length >= this.maxRequests) {
