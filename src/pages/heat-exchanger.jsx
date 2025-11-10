@@ -11,11 +11,11 @@ import { debounce, validators } from '@/lib/security';
 import Header from '@/components/Header';
 
 /**
- * 换热器参数配置页面组件
+ * 换热器参数配置表单组件
  * @param {Object} props - 组件属性
- * @param {Object} props.$w - 云开发实例
- * @param {Object} props.style - 自定义样式
- * @returns {JSX.Element} - 页面组件
+ * @param {Object} props.$w - 微信小程序API对象
+ * @param {Object} props.style - 样式对象
+ * @returns {React.Component} - 表单组件
  */
 export default function HeatExchangerForm(props) {
   const {
@@ -26,75 +26,87 @@ export default function HeatExchangerForm(props) {
     toast
   } = useToast();
 
+  // ========================================
   // 状态管理
+  // ========================================
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
 
-  /**
-   * 表单配置常量
-   */
-  const FORM_CONFIG = {
-    // 换热器类型选项
-    heatExchangerTypes: [{
-      value: 'shell-tube',
-      label: '管壳式'
-    }, {
-      value: 'plate',
-      label: '板式'
-    }, {
-      value: 'air-cooled',
-      label: '空冷式'
-    }, {
-      value: 'spiral',
-      label: '螺旋板式'
-    }, {
-      value: 'other',
-      label: '其他'
-    }],
-    // 材质选项
-    materials: [{
-      value: 'stainless-steel',
-      label: '不锈钢'
-    }, {
-      value: 'carbon-steel',
-      label: '碳钢'
-    }, {
-      value: 'titanium',
-      label: '钛合金'
-    }, {
-      value: 'copper',
-      label: '铜合金'
-    }, {
-      value: 'aluminum',
-      label: '铝合金'
-    }],
-    // 表单默认值
-    defaultValues: {
-      heatExchangerType: '',
-      power: '',
-      inletTemp: '',
-      outletTemp: '',
-      flowRate: '',
-      pressure: '',
-      material: '',
-      application: '',
-      additionalRequirements: '',
-      email: ''
-    }
+  // ========================================
+  // 常量定义
+  // ========================================
+
+  // 换热器类型选项
+  const HEAT_EXCHANGER_TYPES = [{
+    value: 'shell-tube',
+    label: '管壳式'
+  }, {
+    value: 'plate',
+    label: '板式'
+  }, {
+    value: 'air-cooled',
+    label: '空冷式'
+  }, {
+    value: 'spiral',
+    label: '螺旋板式'
+  }, {
+    value: 'other',
+    label: '其他'
+  }];
+
+  // 材质选项
+  const MATERIALS = [{
+    value: 'stainless-steel',
+    label: '不锈钢'
+  }, {
+    value: 'carbon-steel',
+    label: '碳钢'
+  }, {
+    value: 'titanium',
+    label: '钛合金'
+  }, {
+    value: 'copper',
+    label: '铜合金'
+  }, {
+    value: 'aluminum',
+    label: '铝合金'
+  }];
+
+  // 表单初始值
+  const INITIAL_FORM_VALUES = {
+    heatExchangerType: '',
+    power: '',
+    inletTemp: '',
+    outletTemp: '',
+    flowRate: '',
+    pressure: '',
+    material: '',
+    application: '',
+    additionalRequirements: '',
+    email: ''
   };
 
-  // 初始化表单
+  // ========================================
+  // 表单设置
+  // ========================================
+
   const form = useForm({
-    defaultValues: FORM_CONFIG.defaultValues
+    defaultValues: INITIAL_FORM_VALUES
   });
 
-  /**
-   * 组件初始化
-   */
+  // ========================================
+  // 生命周期
+  // ========================================
+
   useEffect(() => {
     setIsLoaded(true);
   }, []);
+
+  // ========================================
+  // 工具函数
+  // ========================================
 
   /**
    * 防抖验证函数
@@ -104,30 +116,45 @@ export default function HeatExchangerForm(props) {
   }, 500), [form]);
 
   /**
-   * 表单提交处理函数
-   * @param {Object} values - 表单数据
+   * 模拟API调用
+   * @param {Object} data - 表单数据
+   * @returns {Promise} - API调用Promise
+   */
+  const simulateApiCall = async data => {
+    // 模拟网络延迟
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    // 这里可以调用实际的API
+    // await $w.cloud.callDataSource({
+    //   dataSourceName: 'heat_exchanger_requests',
+    //   methodName: 'wedaCreateV2',
+    //   params: { data }
+    // });
+
+    return {
+      success: true,
+      message: '提交成功'
+    };
+  };
+
+  /**
+   * 处理表单提交
+   * @param {Object} values - 表单值
    */
   const onSubmit = async values => {
     setIsSubmitting(true);
     try {
-      // 模拟API调用延迟
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // 调用API
+      await simulateApiCall(values);
 
-      // TODO: 实际的API调用
-      // await $w.cloud.callDataSource({
-      //   dataSourceName: 'heat_exchanger_requests',
-      //   methodName: 'wedaCreateV2',
-      //   params: { data: values }
-      // });
-
-      // 提交成功处理
+      // 提交成功
       setIsSubmitted(true);
       toast({
         title: "提交成功！",
         description: "我们已收到您的换热器参数需求，将尽快与您联系。"
       });
     } catch (error) {
-      // 错误处理
+      // 提交失败
       toast({
         title: "提交失败",
         description: error.message || "请稍后重试",
@@ -138,8 +165,13 @@ export default function HeatExchangerForm(props) {
     }
   };
 
+  // ========================================
+  // 渲染函数
+  // ========================================
+
   /**
    * 渲染成功页面
+   * @returns {React.Component} - 成功页面组件
    */
   const renderSuccessPage = () => <div style={style} className="min-h-screen bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-100 flex items-center justify-center p-4 relative overflow-hidden">
       {/* 背景动画元素 */}
@@ -151,10 +183,10 @@ export default function HeatExchangerForm(props) {
         <div className="absolute bottom-20 right-1/3 w-56 h-56 bg-green-300 rounded-full mix-blend-multiply filter blur-xl opacity-50 animate-float-5"></div>
       </div>
       
-      {/* 成功提示卡片 */}
+      {/* 成功页面内容 */}
       <div className="relative z-10 w-full max-w-md">
         <div className="backdrop-blur-3xl bg-white/20 border border-white/40 shadow-2xl rounded-3xl overflow-hidden">
-          {/* 成功图标和标题 */}
+          {/* 成功标题 */}
           <div className="bg-gradient-to-r from-green-400/90 to-emerald-500/90 p-6 text-center backdrop-blur-md">
             <div className="w-20 h-20 bg-white/30 backdrop-blur-lg rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse border border-white/40">
               <CheckCircle className="w-10 h-10 text-white drop-shadow-lg" />
@@ -162,7 +194,7 @@ export default function HeatExchangerForm(props) {
             <h2 className="text-3xl font-bold text-white mb-2 drop-shadow-md">提交成功！</h2>
           </div>
           
-          {/* 成功信息 */}
+          {/* 成功内容 */}
           <div className="p-8 text-center backdrop-blur-md bg-white/10">
             <div className="mb-6">
               <div className="w-16 h-16 bg-gradient-to-br from-blue-500/90 to-purple-600/90 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg border border-white/30">
@@ -195,12 +227,13 @@ export default function HeatExchangerForm(props) {
 
   /**
    * 渲染表单页面
+   * @returns {React.Component} - 表单页面组件
    */
   const renderFormPage = () => <div style={style} className="min-h-screen bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-100">
       {/* 头部导航 */}
       <Header />
       
-      {/* 背景动画元素 */}
+      {/* 动态背景 */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-purple-300 rounded-full mix-blend-multiply filter blur-2xl opacity-40 animate-float-1"></div>
         <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-blue-300 rounded-full mix-blend-multiply filter blur-2xl opacity-40 animate-float-2"></div>
@@ -212,10 +245,9 @@ export default function HeatExchangerForm(props) {
         <div className="absolute top-1/3 left-1/2 w-52 h-52 bg-teal-300 rounded-full mix-blend-multiply filter blur-lg opacity-28 animate-float-8"></div>
       </div>
 
-      {/* 主要内容区域 */}
+      {/* 主内容区域 */}
       <div className={`relative z-10 max-w-6xl mx-auto transition-all duration-1000 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'} pt-24 sm:pt-28`}>
-        
-        {/* 页面标题区域 */}
+        {/* 页面标题 */}
         <div className="text-center mb-6 sm:mb-8 pt-4 sm:pt-6 px-2">
           <div className="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br from-blue-500/90 via-purple-500/90 to-pink-500/90 rounded-2xl sm:rounded-3xl mb-4 sm:mb-6 shadow-2xl border border-white/40 backdrop-blur-2xl">
             <Thermometer className="w-8 h-8 sm:w-10 sm:h-10 text-white drop-shadow-lg" />
@@ -228,7 +260,7 @@ export default function HeatExchangerForm(props) {
           </p>
         </div>
 
-        {/* 表单卡片 */}
+        {/* 表单容器 */}
         <div className="backdrop-blur-3xl bg-white/20 border border-white/40 shadow-2xl rounded-2xl sm:rounded-3xl overflow-hidden">
           {/* 表单头部 */}
           <div className="bg-gradient-to-r from-blue-500/90 via-purple-500/90 to-pink-500/90 p-4 sm:p-5 backdrop-blur-md border-b border-white/30">
@@ -253,8 +285,7 @@ export default function HeatExchangerForm(props) {
           <div className="p-4 sm:p-6 lg:p-8 backdrop-blur-md bg-white/10">
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 sm:space-y-8">
-                
-                {/* 核心参数区域 */}
+                {/* 核心参数部分 */}
                 <div className="space-y-4 sm:space-y-6">
                   <div className="flex items-center gap-3 mb-4">
                     <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-red-500/90 to-orange-500/90 rounded-xl flex items-center justify-center shadow-lg border border-white/40 backdrop-blur-lg">
@@ -265,7 +296,7 @@ export default function HeatExchangerForm(props) {
                   
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
                     <div className="space-y-4">
-                      <SimpleFormField control={form.control} name="heatExchangerType" label="换热器类型 *" placeholder="选择类型" type="select" icon={Building2} options={FORM_CONFIG.heatExchangerTypes} validationRules={{
+                      <SimpleFormField control={form.control} name="heatExchangerType" label="换热器类型 *" placeholder="选择类型" type="select" icon={Building2} options={HEAT_EXCHANGER_TYPES} validationRules={{
                       required: true
                     }} />
 
@@ -286,7 +317,7 @@ export default function HeatExchangerForm(props) {
                   </div>
                 </div>
 
-                {/* 流体与材质区域 */}
+                {/* 流体与材质部分 */}
                 <div className="space-y-4 sm:space-y-6">
                   <div className="flex items-center gap-3 mb-4">
                     <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-cyan-500/90 to-blue-500/90 rounded-xl flex items-center justify-center shadow-lg border border-white/40 backdrop-blur-lg">
@@ -307,7 +338,7 @@ export default function HeatExchangerForm(props) {
                     </div>
 
                     <div className="space-y-4">
-                      <SimpleFormField control={form.control} name="material" label="材质要求 *" placeholder="选择材质" type="select" options={FORM_CONFIG.materials} validationRules={{
+                      <SimpleFormField control={form.control} name="material" label="材质要求 *" placeholder="选择材质" type="select" options={MATERIALS} validationRules={{
                       required: true
                     }} />
 
@@ -318,7 +349,7 @@ export default function HeatExchangerForm(props) {
                   </div>
                 </div>
 
-                {/* 特殊要求区域 */}
+                {/* 特殊要求部分 */}
                 <div className="space-y-4">
                   <div className="flex items-center gap-3 mb-4">
                     <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-green-500/90 to-emerald-500/90 rounded-xl flex items-center justify-center shadow-lg border border-white/40 backdrop-blur-lg">
@@ -334,7 +365,7 @@ export default function HeatExchangerForm(props) {
                   </div>
                 </div>
 
-                {/* 联系邮箱区域 */}
+                {/* 联系信息部分 */}
                 <div className="backdrop-blur-xl bg-white/30 rounded-xl p-6 border border-white/40 shadow-lg transition-all duration-300 hover:shadow-xl hover:bg-white/40">
                   <div className="flex items-center gap-3 mb-4">
                     <div className="w-10 h-10 bg-gradient-to-br from-blue-500/90 to-purple-600/90 rounded-xl flex items-center justify-center shadow-lg border border-white/40 backdrop-blur-lg">
@@ -369,7 +400,7 @@ export default function HeatExchangerForm(props) {
           </div>
         </div>
 
-        {/* 底部信息 */}
+        {/* 页面底部信息 */}
         <div className="text-center mt-6 sm:mt-10 text-gray-600">
           <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6 text-xs sm:text-sm">
             <div className="flex items-center gap-1 sm:gap-2 backdrop-blur-sm bg-white/30 rounded-full px-3 py-1 border border-white/30">
@@ -457,6 +488,10 @@ export default function HeatExchangerForm(props) {
         .animate-float-8 { animation: float-8 9.5s ease-in-out infinite; }
       `}</style>
     </div>;
+
+  // ========================================
+  // 主渲染逻辑
+  // ========================================
 
   // 根据提交状态渲染不同页面
   return isSubmitted ? renderSuccessPage() : renderFormPage();
