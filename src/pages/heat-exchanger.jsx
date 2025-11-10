@@ -1,13 +1,13 @@
 // @ts-ignore;
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 // @ts-ignore;
 import { Button, Form, useToast } from '@/components/ui';
 // @ts-ignore;
-import { Mail, Thermometer, Droplets, Wind, Zap, CheckCircle, Loader2, Settings, Gauge, Waves, Shield, Sparkles, ArrowRight, Building2, AlertCircle, Lock } from 'lucide-react';
+import { Mail, Thermometer, Droplets, Wind, Zap, CheckCircle, Loader2, Settings, Gauge, Waves, Shield, Sparkles, ArrowRight, Building2, AlertCircle } from 'lucide-react';
 
 import { useForm } from 'react-hook-form';
-import { SecureFormField } from '@/components/SecureFormField';
-import { escapeHtml, encryptData, generateCSRFToken, generateAPISignature, getEnhancedClientInfo, collectUserBehavior, debounce, rateLimiter } from '@/lib/security';
+import { SimpleFormField } from '@/components/SimpleFormField';
+import { debounce, validators } from '@/lib/security';
 import Header from '@/components/Header';
 export default function HeatExchangerForm(props) {
   const {
@@ -20,13 +20,6 @@ export default function HeatExchangerForm(props) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
-  const [csrfToken, setCsrfToken] = useState('');
-  const [showSecurityInfo, setShowSecurityInfo] = useState(false);
-  const [encryptionStatus, setEncryptionStatus] = useState('ready');
-  const [clientInfo, setClientInfo] = useState(null);
-  const [userBehavior, setUserBehavior] = useState(null);
-  const cleanupBehaviorRef = useRef(null);
-  const formStartTime = useRef(Date.now());
   const heatExchangerTypes = [{
     value: 'shell-tube',
     label: '管壳式'
@@ -75,151 +68,36 @@ export default function HeatExchangerForm(props) {
   });
   useEffect(() => {
     setIsLoaded(true);
-
-    // 生成CSRF Token
-    const token = generateCSRFToken();
-    setCsrfToken(token);
-    sessionStorage.setItem('csrfToken', token);
-
-    // 收集增强的客户端信息
-    const enhancedInfo = getEnhancedClientInfo();
-    setClientInfo(enhancedInfo);
-
-    // 开始收集用户行为数据
-    const cleanupBehavior = collectUserBehavior();
-    cleanupBehaviorRef.current = cleanupBehavior;
-
-    // 页面卸载时清理
-    return () => {
-      if (cleanupBehaviorRef.current) {
-        const behaviorData = cleanupBehaviorRef.current();
-        setUserBehavior(behaviorData);
-      }
-    };
   }, []);
   const debouncedValidation = useCallback(debounce((fieldName, value) => {
     form.trigger(fieldName);
   }, 500), [form]);
-  const secureSubmit = async data => {
-    if (!rateLimiter.isAllowed()) {
-      const remainingTime = Math.ceil(rateLimiter.getRemainingTime() / 1000);
-      throw new Error(`请求过于频繁，请${remainingTime}秒后再试`);
-    }
-
-    // 收集最终的用户行为数据
-    let finalBehavior = null;
-    if (cleanupBehaviorRef.current) {
-      finalBehavior = cleanupBehaviorRef.current();
-    }
-    const timestamp = Date.now();
-    const nonce = generateCSRFToken();
-
-    // 清理和转义表单数据
-    const sanitizedData = {};
-    Object.keys(data).forEach(key => {
-      if (data[key]) {
-        sanitizedData[key] = escapeHtml(data[key].toString());
-      }
-    });
-
-    // 准备完整的提交数据
-    const submitData = {
-      // 表单数据
-      formData: sanitizedData,
-      // 增强的客户端信息
-      clientInfo: clientInfo,
-      // 用户行为数据
-      userBehavior: finalBehavior,
-      // 表单交互统计
-      formStats: {
-        formStartTime: formStartTime.current,
-        formSubmitTime: timestamp,
-        timeToSubmit: timestamp - formStartTime.current,
-        fieldChanges: form.formState.dirtyFields,
-        touchedFields: form.formState.touchedFields,
-        submitCount: form.formState.submitCount,
-        errors: form.formState.errors
-      },
-      // 安全信息
-      security: {
-        csrfToken,
-        timestamp,
-        nonce
-      }
-    };
-
-    // 生成API签名
-    const signature = generateAPISignature(sanitizedData, timestamp, nonce);
-    submitData.security.signature = signature;
-    setEncryptionStatus('encrypting');
-    const encryptedData = encryptData(submitData);
-    if (!encryptedData) {
-      throw new Error('数据加密失败');
-    }
-    setEncryptionStatus('encrypted');
-    try {
-      const result = await $w.cloud.callFunction({
-        name: 'submitHeatExchangerRequest',
-        data: {
-          encryptedData,
-          signature,
-          timestamp,
-          nonce,
-          csrfToken,
-          // 发送未加密的元数据用于日志记录
-          metadata: {
-            formId: 'heat-exchanger-config',
-            version: '1.0',
-            userAgent: clientInfo?.userAgent,
-            sessionId: clientInfo?.sessionId,
-            submitTime: new Date().toISOString()
-          }
-        }
-      });
-      return result;
-    } catch (error) {
-      console.error('API调用失败:', error);
-      throw error;
-    }
-  };
   const onSubmit = async values => {
     setIsSubmitting(true);
-    setEncryptionStatus('ready');
     try {
-      const result = await secureSubmit(values);
+      // 模拟API调用
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // 这里可以调用实际的API
+      // await $w.cloud.callDataSource({
+      //   dataSourceName: 'heat_exchanger_requests',
+      //   methodName: 'wedaCreateV2',
+      //   params: { data: values }
+      // });
+
       setIsSubmitted(true);
       toast({
         title: "提交成功！",
-        description: "我们已收到您的换热器参数需求，将尽快与您联系。",
-        action: <Button variant="outline" size="sm" onClick={() => setShowSecurityInfo(!showSecurityInfo)}>
-            <Lock className="w-4 h-4 mr-1" />
-            安全信息
-          </Button>
+        description: "我们已收到您的换热器参数需求，将尽快与您联系。"
       });
     } catch (error) {
-      console.error('提交失败:', error);
-      let errorMessage = '提交失败，请稍后重试';
-      if (error.message.includes('请求过于频繁')) {
-        errorMessage = error.message;
-      } else if (error.message.includes('数据加密失败')) {
-        errorMessage = '数据加密失败，请检查网络连接';
-      } else if (error.message.includes('CSRF')) {
-        errorMessage = '安全验证失败，请刷新页面重试';
-      } else if (error.message.includes('签名验证失败')) {
-        errorMessage = '数据完整性验证失败，请重试';
-      }
       toast({
         title: "提交失败",
-        description: errorMessage,
-        variant: "destructive",
-        action: <Button variant="outline" size="sm" onClick={() => setShowSecurityInfo(!showSecurityInfo)}>
-            <AlertCircle className="w-4 h-4 mr-1" />
-            查看详情
-          </Button>
+        description: error.message || "请稍后重试",
+        variant: "destructive"
       });
     } finally {
       setIsSubmitting(false);
-      setEncryptionStatus('ready');
     }
   };
   if (isSubmitted) {
@@ -251,30 +129,14 @@ export default function HeatExchangerForm(props) {
                 </p>
               </div>
               
-              {showSecurityInfo && <div className="mb-6 p-4 bg-blue-50/50 border border-blue-200/50 rounded-lg">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Shield className="w-4 h-4 text-blue-600" />
-                    <span className="text-sm font-semibold text-blue-800">数据收集信息</span>
-                  </div>
-                  <ul className="text-xs text-blue-700 space-y-1">
-                    <li>• 表单数据已完整收集</li>
-                    <li>• 浏览器和设备信息已记录</li>
-                    <li>• 用户行为数据已分析</li>
-                    <li>• 所有数据已加密保护</li>
-                    <li>• 遵循隐私保护法规</li>
-                  </ul>
-                </div>}
-              
               <div className="space-y-3">
                 <div className="flex items-center justify-center gap-2 text-sm text-gray-600 backdrop-blur-sm bg-white/20 rounded-full px-3 py-1">
                   <Shield className="w-4 h-4 text-green-500" />
-                  <span>您的信息已加密保护</span>
+                  <span>您的信息已安全保存</span>
                 </div>
                 <Button onClick={() => {
                 setIsSubmitted(false);
                 form.reset();
-                setShowSecurityInfo(false);
-                formStartTime.current = Date.now();
               }} className="w-full bg-gradient-to-r from-blue-500/90 to-purple-600/90 hover:from-blue-600/90 hover:to-purple-700/90 text-white font-semibold py-4 rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-xl border border-white/30 backdrop-blur-md">
                   <Sparkles className="w-4 h-4 mr-2" />
                   提交新的需求
@@ -312,15 +174,6 @@ export default function HeatExchangerForm(props) {
           </p>
         </div>
 
-        <div className="mb-4 flex justify-center">
-          <div className="backdrop-blur-sm bg-white/20 rounded-full px-4 py-2 border border-white/30 flex items-center gap-2">
-            <Shield className="w-4 h-4 text-green-500" />
-            <span className="text-sm text-gray-700">安全保护已启用</span>
-            {encryptionStatus === 'encrypting' && <Loader2 className="w-3 h-3 animate-spin text-blue-500" />}
-            {encryptionStatus === 'encrypted' && <Lock className="w-3 h-3 text-green-500" />}
-          </div>
-        </div>
-
         <div className="backdrop-blur-3xl bg-white/20 border border-white/40 shadow-2xl rounded-2xl sm:rounded-3xl overflow-hidden">
           <div className="bg-gradient-to-r from-blue-500/90 via-purple-500/90 to-pink-500/90 p-4 sm:p-5 backdrop-blur-md border-b border-white/30">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -335,7 +188,7 @@ export default function HeatExchangerForm(props) {
               </div>
               <div className="flex items-center gap-2 justify-center sm:justify-start backdrop-blur-sm bg-white/20 rounded-full px-3 py-1 border border-white/30">
                 <Sparkles className="w-4 h-4 text-yellow-300 drop-shadow-sm" />
-                <span className="text-white/90 text-sm drop-shadow-sm">AI 智能推荐</span>
+                <span className="text-white/90 text-sm drop-shadow-sm">智能推荐</span>
               </div>
             </div>
           </div>
@@ -353,21 +206,21 @@ export default function HeatExchangerForm(props) {
                   
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
                     <div className="space-y-4">
-                      <SecureFormField control={form.control} name="heatExchangerType" label="换热器类型 *" placeholder="选择类型" type="select" icon={Building2} options={heatExchangerTypes} validationRules={{
+                      <SimpleFormField control={form.control} name="heatExchangerType" label="换热器类型 *" placeholder="选择类型" type="select" icon={Building2} options={heatExchangerTypes} validationRules={{
                       required: true
                     }} />
 
-                      <SecureFormField control={form.control} name="power" label="功率 (kW) *" placeholder="如: 100 或 50-200" icon={Zap} validationRules={{
+                      <SimpleFormField control={form.control} name="power" label="功率 (kW) *" placeholder="如: 100 或 50-200" icon={Zap} validationRules={{
                       required: true
                     }} />
                     </div>
 
                     <div className="space-y-4">
-                      <SecureFormField control={form.control} name="inletTemp" label="进口温度 (°C) *" placeholder="如: 80" icon={Thermometer} validationRules={{
+                      <SimpleFormField control={form.control} name="inletTemp" label="进口温度 (°C) *" placeholder="如: 80" icon={Thermometer} validationRules={{
                       required: true
                     }} />
 
-                      <SecureFormField control={form.control} name="outletTemp" label="出口温度 (°C) *" placeholder="如: 40" icon={Thermometer} validationRules={{
+                      <SimpleFormField control={form.control} name="outletTemp" label="出口温度 (°C) *" placeholder="如: 40" icon={Thermometer} validationRules={{
                       required: true
                     }} />
                     </div>
@@ -384,21 +237,21 @@ export default function HeatExchangerForm(props) {
                   
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
                     <div className="space-y-4">
-                      <SecureFormField control={form.control} name="flowRate" label="流量 (m³/h) *" placeholder="如: 50 或 20-100" icon={Wind} validationRules={{
+                      <SimpleFormField control={form.control} name="flowRate" label="流量 (m³/h) *" placeholder="如: 50 或 20-100" icon={Wind} validationRules={{
                       required: true
                     }} />
 
-                      <SecureFormField control={form.control} name="pressure" label="压力 (MPa) *" placeholder="如: 2.0 或 1.0-3.0" icon={Droplets} validationRules={{
+                      <SimpleFormField control={form.control} name="pressure" label="压力 (MPa) *" placeholder="如: 2.0 或 1.0-3.0" icon={Droplets} validationRules={{
                       required: true
                     }} />
                     </div>
 
                     <div className="space-y-4">
-                      <SecureFormField control={form.control} name="material" label="材质要求 *" placeholder="选择材质" type="select" options={materials} validationRules={{
+                      <SimpleFormField control={form.control} name="material" label="材质要求 *" placeholder="选择材质" type="select" options={materials} validationRules={{
                       required: true
                     }} />
 
-                      <SecureFormField control={form.control} name="application" label="应用场景" placeholder="如: 化工、制冷、空调等" validationRules={{
+                      <SimpleFormField control={form.control} name="application" label="应用场景" placeholder="如: 化工、制冷、空调等" validationRules={{
                       maxLength: 100
                     }} />
                     </div>
@@ -414,7 +267,7 @@ export default function HeatExchangerForm(props) {
                   </div>
                   
                   <div className="backdrop-blur-xl bg-white/30 rounded-xl p-4 border border-white/40 shadow-lg transition-all duration-300 hover:shadow-xl hover:bg-white/40">
-                    <SecureFormField control={form.control} name="additionalRequirements" label="附加要求" placeholder="请描述其他特殊要求或技术细节..." type="textarea" validationRules={{
+                    <SimpleFormField control={form.control} name="additionalRequirements" label="附加要求" placeholder="请描述其他特殊要求或技术细节..." type="textarea" validationRules={{
                     maxLength: 500
                   }} />
                   </div>
@@ -428,7 +281,7 @@ export default function HeatExchangerForm(props) {
                     <h3 className="text-lg font-bold text-gray-800 drop-shadow-sm">联系邮箱 *</h3>
                   </div>
                   
-                  <SecureFormField control={form.control} name="email" placeholder="请输入您的邮箱地址" validationRules={{
+                  <SimpleFormField control={form.control} name="email" placeholder="请输入您的邮箱地址" validationRules={{
                   required: true
                 }} className="pl-10 pr-4 py-3 text-base" />
                 </div>
@@ -438,10 +291,10 @@ export default function HeatExchangerForm(props) {
                     <span className="relative z-10 flex items-center gap-2 sm:gap-3 justify-center">
                       {isSubmitting ? <>
                           <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin drop-shadow-sm" />
-                          {encryptionStatus === 'encrypting' ? '加密中...' : '提交中...'}
+                          提交中...
                         </> : <>
                           <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 drop-shadow-sm" />
-                          安全提交
+                          提交参数
                           <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 group-hover:translate-x-1 transition-transform duration-300 drop-shadow-sm" />
                         </>}
                     </span>
@@ -460,10 +313,6 @@ export default function HeatExchangerForm(props) {
               <span>隐私保护</span>
             </div>
             <div className="flex items-center gap-1 sm:gap-2 backdrop-blur-sm bg-white/30 rounded-full px-3 py-1 border border-white/30">
-              <Lock className="w-3 h-3 sm:w-4 sm:h-4 text-blue-500 drop-shadow-sm" />
-              <span>数据加密</span>
-            </div>
-            <div className="flex items-center gap-1 sm:gap-2 backdrop-blur-sm bg-white/30 rounded-full px-3 py-1 border border-white/30">
               <Zap className="w-3 h-3 sm:w-4 sm:h-4 text-yellow-500 drop-shadow-sm" />
               <span>快速响应</span>
             </div>
@@ -473,7 +322,7 @@ export default function HeatExchangerForm(props) {
             </div>
           </div>
           <p className="mt-3 sm:mt-4 text-xs text-gray-500 backdrop-blur-sm bg-white/20 rounded-full px-3 py-1 border border-white/30">
-            我们承诺保护您的隐私信息，采用银行级加密技术，仅用于技术方案制定
+            我们承诺保护您的隐私信息，仅用于技术方案制定
           </p>
         </div>
       </div>
