@@ -21,7 +21,11 @@ export function SecureFormField({
       return '此字段为必填项';
     }
     if (!value) return null;
+
+    // XSS防护 - 转义输入内容
     const sanitizedValue = escapeHtml(value.toString());
+
+    // 根据字段类型进行验证
     switch (name) {
       case 'email':
         if (!validators.email(sanitizedValue)) {
